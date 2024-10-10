@@ -860,10 +860,7 @@ public class WLToolkit extends UNIXToolkit implements Runnable {
      */
     @Override
     public InputMethodDescriptor getInputMethodAdapterDescriptor() {
-        if (log.isLoggable(PlatformLogger.Level.FINE)) {
-            log.fine("Not implemented: WLToolkit.getInputMethodAdapterDescriptor()");
-        }
-        return null;
+        return WLInputMethodDescriptor.getInstanceIfAvailableOnPlatform();
     }
 
     /**
