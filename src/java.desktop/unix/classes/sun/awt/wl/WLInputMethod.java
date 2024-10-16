@@ -41,6 +41,10 @@ public final class WLInputMethod extends InputMethodAdapter {
     private static final PlatformLogger log = PlatformLogger.getLogger("sun.awt.wl.WLInputMethod");
 
 
+    public WLInputMethod() throws AWTException {
+        wlInitializeContext();
+    }
+
     /* sun.awt.im.InputMethodAdapter methods section */
 
     @Override
@@ -143,6 +147,7 @@ public final class WLInputMethod extends InputMethodAdapter {
 
     @Override
     public void dispose() {
+        wlDisposeContext();
     }
 
     @Override
@@ -151,7 +156,33 @@ public final class WLInputMethod extends InputMethodAdapter {
     }
 
 
+    /* java.lang.Object methods section (overriding some of its methods) */
+
+    @SuppressWarnings("removal")
+    @Override
+    protected void finalize() throws Throwable {
+        dispose();
+        super.finalize();
+    }
+
+
     /* Implementation details section */
+
+    // Since WLToolkit dispatches (almost) all native Wayland events on EDT, not on its thread,
+    //   there's no need for this class to think about multithreading issues - all of its parts may only be executed
+    //   on EDT.
+    // If WLToolkit dispatched native Wayland events on its thread {@link sun.awt.wl.WLToolkit#isToolkitThread},
+    //   this class would require the following modifications:
+    //     - Guarding access to the fields with some synchronization primitives
+    //     - Taking into account that zwp_text_input_v3_on* callbacks may even be called when the constructor doesn't
+    //       even return yet (in the current implementation)
+    //     - Reworking the implementation of {@link #disposeNativeContext(long)} so that it prevents
+    //       use-after-free access errors to the destroyed native context from the native handlers of
+    //       zwp_text_input_v3 native events.
+
+    static {
+        initIDs();
+    }
 
     /**
      * The interface serves just as a namespace for all the types, constants
@@ -723,6 +754,45 @@ public final class WLInputMethod extends InputMethodAdapter {
             public static JavaCommitString fromWaylandCommitString(byte[] utf8Bytes) {
                 return new JavaCommitString(utf8BytesToJavaString(utf8Bytes));
             }
+        }
+    }
+
+
+    /** The reference must only be (directly) modified in {@link #wlInitializeContext()} and {@link #wlDisposeContext()}. */
+    private ZwpTextInputV3.InputContextState inputContextState = null;
+
+
+    /* Core methods section */
+
+    private void wlInitializeContext() throws AWTException {
+        assert(inputContextState == null);
+
+        long nativeCtxPtr = 0;
+
+        try {
+            nativeCtxPtr = createNativeContext();
+            if (nativeCtxPtr == 0) {
+                throw new AWTException("nativeCtxPtr == 0");
+            }
+
+            inputContextState = new ZwpTextInputV3.InputContextState(nativeCtxPtr);
+        } catch (Throwable err) {
+            if (nativeCtxPtr != 0) {
+                disposeNativeContext(nativeCtxPtr);
+                nativeCtxPtr = 0;
+            }
+
+            throw err;
+        }
+    }
+
+    private void wlDisposeContext() {
+        final var ctxToDispose = this.inputContextState;
+
+        inputContextState = null;
+
+        if (ctxToDispose != null && ctxToDispose.nativeContextPtr != 0) {
+            disposeNativeContext(ctxToDispose.nativeContextPtr);
         }
     }
 
