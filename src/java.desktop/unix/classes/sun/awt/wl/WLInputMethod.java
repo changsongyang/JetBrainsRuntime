@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
+import javax.swing.Timer;
 
 public final class WLInputMethod extends InputMethodAdapter {
 
@@ -299,6 +300,8 @@ public final class WLInputMethod extends InputMethodAdapter {
                 this.nativeContextPtr = nativeContextPtr;
             }
 
+            public long getCurrentWlSurfacePtr() { return currentWlSurfacePtr; }
+
 
             // zwp_text_input_v3::commit + zwp_text_input_v3::done
             /**
@@ -453,6 +456,34 @@ public final class WLInputMethod extends InputMethodAdapter {
             }
 
             public Rectangle getCursorRectangle() { return newCaretRectangle; }
+
+
+            public boolean isEmpty() {
+                return (getEnabledState() == null &&
+                        getTextChangeCause() == null &&
+                        getContentTypeHint() == null &&
+                        getCursorRectangle() == null);
+            }
+
+
+            public OutgoingChanges appendChangesFrom(OutgoingChanges src) {
+                if (src == null) return this;
+
+                if (getEnabledState() == null) {
+                    setEnabledState(src.getEnabledState());
+                }
+                if (getTextChangeCause() == null) {
+                    setTextChangeCause(src.getTextChangeCause());
+                }
+                if (getContentTypeHint() == null) {
+                    setContentType(src.getContentTypeHint(), src.getContentTypePurpose());
+                }
+                if (getCursorRectangle() == null) {
+                    setCursorRectangle(src.getCursorRectangle());
+                }
+
+                return this;
+            }
         }
 
         /**
@@ -758,15 +789,85 @@ public final class WLInputMethod extends InputMethodAdapter {
     }
 
 
+    /* Wayland-side state section */
+
+    // The fields in this section are prefixed with "wl" and aren't supposed to be modified by
+    //   non-Wayland-related methods (whose names are prefixed with "wl" or "zwp_text_input_v3_"),
+    //   though can be read by them.
+
+    private final class WLChangesAsyncSender {
+        public WLChangesAsyncSender() {
+            senderTimer = new Timer(SENDER_TIMER_PERIOD_MS, WLChangesAsyncSender.this::asyncSendingRoutine);
+            senderTimer.setInitialDelay(SENDER_TIMER_INITIAL_DELAY_MS);
+            senderTimer.setRepeats(true);
+            senderTimer.setCoalesce(true);
+        }
+
+        public void start() {
+            if (isWorking()) {
+                return;
+            }
+            senderTimer.start();
+        }
+
+        public void stop() {
+            if (!isWorking()) {
+                return;
+            }
+            senderTimer.stop();
+        }
+
+        public boolean isWorking() {
+            return senderTimer.isRunning();
+        }
+
+
+        private static final int SENDER_TIMER_PERIOD_MS = 100;
+        // Not 0 just to avoid firing the listener synchronously
+        private static final int SENDER_TIMER_INITIAL_DELAY_MS = 1;
+        private final Timer senderTimer;
+
+        private void asyncSendingRoutine(java.awt.event.ActionEvent e) {
+            assert(EventQueue.isDispatchThread());
+
+            if (WLInputMethod.this.wlCanSendChangesNow()) {
+                WLInputMethod.this.wlSendPendingChangesNow();
+            }
+
+            if (WLInputMethod.this.wlPendingChanges1 == null && WLInputMethod.this.wlPendingChanges2 == null) {
+                // Nothing to send (anymore)
+                stop();
+            }
+        }
+    }
+
     /** The reference must only be (directly) modified in {@link #wlInitializeContext()} and {@link #wlDisposeContext()}. */
-    private ZwpTextInputV3.InputContextState inputContextState = null;
+    private ZwpTextInputV3.InputContextState wlInputContextState = null;
+    /**
+     * wlPendingChanges1 and wlPendingChanges2 form a queue of pending changes sets, where
+     *   wlPendingChanges1 is the top of the queue.
+     * <p>
+     * See {@link ZwpTextInputV3.OutgoingChanges} for the explanation why there's a need to store changes set
+     *   instead of sending them as soon as they appear.
+     * <p>
+     * It's not enough to keep only one set of changes, because the operation of resetting the Wayland context state
+     *   in this protocol implies sending the sequence of Wayland requests disable+enable.
+     */
+    private ZwpTextInputV3.OutgoingChanges wlPendingChanges1 = null, wlPendingChanges2 = null;
+    private final WLChangesAsyncSender wlChangesAsyncSender = new WLChangesAsyncSender();
+    private ZwpTextInputV3.OutgoingBeingCommittedChanges wlBeingCommittedChanges = null;
 
 
     /* Core methods section */
 
     private void wlInitializeContext() throws AWTException {
-        assert(inputContextState == null);
+        assert(wlInputContextState == null);
+        assert(wlPendingChanges1 == null);
+        assert(wlPendingChanges2 == null);
+        assert(!wlChangesAsyncSender.isWorking());
+        assert(wlBeingCommittedChanges == null);
 
+        wlBeingCommittedChanges = new ZwpTextInputV3.OutgoingBeingCommittedChanges();
         long nativeCtxPtr = 0;
 
         try {
@@ -775,8 +876,9 @@ public final class WLInputMethod extends InputMethodAdapter {
                 throw new AWTException("nativeCtxPtr == 0");
             }
 
-            inputContextState = new ZwpTextInputV3.InputContextState(nativeCtxPtr);
+            wlInputContextState = new ZwpTextInputV3.InputContextState(nativeCtxPtr);
         } catch (Throwable err) {
+            wlBeingCommittedChanges = null;
             if (nativeCtxPtr != 0) {
                 disposeNativeContext(nativeCtxPtr);
                 nativeCtxPtr = 0;
@@ -787,13 +889,197 @@ public final class WLInputMethod extends InputMethodAdapter {
     }
 
     private void wlDisposeContext() {
-        final var ctxToDispose = this.inputContextState;
+        final var ctxToDispose = this.wlInputContextState;
 
-        inputContextState = null;
+        wlInputContextState = null;
+        wlPendingChanges1 = null;
+        wlPendingChanges2 = null;
+        wlChangesAsyncSender.stop();
+        wlBeingCommittedChanges = null;
 
         if (ctxToDispose != null && ctxToDispose.nativeContextPtr != 0) {
             disposeNativeContext(ctxToDispose.nativeContextPtr);
         }
+    }
+
+    private boolean wlCanSendChangesNow() {
+        return wlInputContextState != null &&
+               wlInputContextState.nativeContextPtr != 0 &&
+               !wlBeingCommittedChanges.hasBeingCommitedChanges();
+    }
+
+    private void wlSendPendingChangesNow() {
+        assert(wlCanSendChangesNow());
+
+        if (wlPendingChanges1 == null || wlPendingChanges1.isEmpty()) {
+            wlPendingChanges1 = wlPendingChanges2;
+            wlPendingChanges2 = null;
+        }
+
+        final ZwpTextInputV3.OutgoingChanges changesToSend = wlPendingChanges1;
+        wlPendingChanges1 = wlPendingChanges2;
+        wlPendingChanges2 = null;
+
+        if (changesToSend == null || changesToSend.isEmpty()) {
+            // Nothing to send
+            return;
+        }
+
+        if (wlInputContextState.getCurrentWlSurfacePtr() == 0) {
+            // "After leave event, compositor must ignore requests from any text input instances until next enter event."
+            // Thus, it doesn't make sense to send any requests, let's drop the change set.
+
+            if (log.isLoggable(PlatformLogger.Level.FINE)) {
+                log.fine("wlSendPendingChangesNow: wlInputContextState.getCurrentWlSurfacePtr()=0. Dropping the change set {0}", changesToSend);
+            }
+
+            return;
+        }
+
+        // TODO: make sure the current AWT component belongs to the surface wlInputContextState.getCurrentWlSurfacePtr()
+
+        if (Boolean.TRUE.equals(changesToSend.getEnabledState())) {
+            // All enable requests should be accompanied by property set requests for the following reasons:
+            // 1. To let the compositor know working with which properties we support.
+            // 2. Some properties (content_type) cannot be modified after enable + commit (until next enable + commit).
+
+            if (changesToSend.getContentTypeHint() == null) {
+                changesToSend.setContentType(ZwpTextInputV3.ContentHint.NONE.intMask, ZwpTextInputV3.ContentPurpose.NORMAL);
+            }
+            // TODO: update cursorRectangle unconditionally:
+            //   It's worth calculating and providing the current cursor position to avoid showing IM popups at the wrong places
+            if (changesToSend.getCursorRectangle() == null) {
+                changesToSend.setCursorRectangle(new Rectangle(0, 0, 1, 1));
+            }
+            if (changesToSend.getTextChangeCause() == null) {
+                changesToSend.setTextChangeCause(ZwpTextInputV3.ChangeCause.OTHER);
+            }
+        }
+
+        if (log.isLoggable(PlatformLogger.Level.FINER)) {
+            log.finer("wlSendPendingChangesNow: sending the change set: {0}.", changesToSend);
+        }
+
+        if (Boolean.TRUE.equals(changesToSend.getEnabledState())) {
+            zwp_text_input_v3_enable(wlInputContextState.nativeContextPtr);
+        }
+
+        if (changesToSend.getTextChangeCause() != null) {
+            zwp_text_input_v3_set_text_change_cause(wlInputContextState.nativeContextPtr,
+                                                    changesToSend.getTextChangeCause().intValue);
+        }
+
+        if (changesToSend.getContentTypeHint() != null && changesToSend.getContentTypePurpose() != null) {
+            zwp_text_input_v3_set_content_type(wlInputContextState.nativeContextPtr,
+                                               changesToSend.getContentTypeHint(),
+                                               changesToSend.getContentTypePurpose().intValue);
+        }
+
+        if (changesToSend.getCursorRectangle() != null) {
+            zwp_text_input_v3_set_cursor_rectangle(wlInputContextState.nativeContextPtr,
+                                                   changesToSend.getCursorRectangle().x,
+                                                   changesToSend.getCursorRectangle().y,
+                                                   changesToSend.getCursorRectangle().width,
+                                                   changesToSend.getCursorRectangle().height);
+        }
+
+        if (Boolean.FALSE.equals(changesToSend.getEnabledState())) {
+            zwp_text_input_v3_disable(wlInputContextState.nativeContextPtr);
+            // TODO: "After [...] disable request all state information is invalidated and needs to be resent by the client."
+        }
+
+        zwp_text_input_v3_commit(wlInputContextState.nativeContextPtr);
+
+        wlBeingCommittedChanges.acceptNewBeingCommitedChanges(changesToSend);
+    }
+
+    private void wlSendPendingChangesLater() {
+        if (wlPendingChanges1 == null && wlPendingChanges2 == null) {
+            // Nothing to send
+            return;
+        }
+
+        wlChangesAsyncSender.start();
+    }
+
+    private void wlSendPendingChangesNowOrLater() {
+        if (wlCanSendChangesNow()) {
+            wlSendPendingChangesNow();
+        } else {
+            wlSendPendingChangesLater();
+        }
+    }
+
+    private void wlScheduleContextNewChanges(ZwpTextInputV3.OutgoingChanges newOutgoingChanges) {
+        if (wlPendingChanges1 == null) {
+            wlPendingChanges1 = wlPendingChanges2;
+            wlPendingChanges2 = null;
+        }
+
+        if (wlPendingChanges1 == null) {
+            wlPendingChanges1 = newOutgoingChanges;
+            return;
+        }
+        if (wlPendingChanges2 == null) {
+            wlPendingChanges2 = newOutgoingChanges;
+            return;
+        }
+
+        final boolean haveUnmergeableChanges =
+            (newOutgoingChanges.getEnabledState() != null &&
+             wlPendingChanges2.getEnabledState()  != null &&
+             newOutgoingChanges.getEnabledState() != wlPendingChanges2.getEnabledState());
+
+        if (!haveUnmergeableChanges) {
+            wlPendingChanges2 = newOutgoingChanges.appendChangesFrom(wlPendingChanges2);
+            return;
+        }
+
+        final boolean newEnabledState = newOutgoingChanges.getEnabledState();
+
+        //noinspection PointlessBooleanExpression
+        if (newEnabledState == true) {
+            //noinspection PointlessBooleanExpression
+            assert(wlPendingChanges2.getEnabledState() == false);
+
+            // Since we want to disable the context with wlPendingChanges2,
+            //   it doesn't make sense to either enable or disable it with wlPendingChanges1.
+            // In other words, we can ignore the value of wlPendingChanges1.getEnabledState() here, hence
+            //   wlPendingChanges1 and wlPendingChanges2 have no unmergeable changes, hence we can merge them thus
+            //   freeing up a slot for newOutgoingChanges.
+            wlPendingChanges1 = wlPendingChanges2.appendChangesFrom(wlPendingChanges1);
+            wlPendingChanges2 = newOutgoingChanges;
+        } else {
+            //noinspection PointlessBooleanExpression
+            assert(wlPendingChanges2.getEnabledState() == true);
+
+            // The same logic as in the positive branch is applicable here
+            //   (but for newOutgoingChanges vs wlPendingChanges2 instead of wlPendingChanges2 vs wlPendingChanges1).
+            wlPendingChanges2 = newOutgoingChanges.appendChangesFrom(wlPendingChanges2);
+        }
+
+        assert(wlGetContextLatestFutureEnabledState() == newEnabledState);
+    }
+
+    private boolean wlGetContextUpcomingOrCurrentEnabledState() {
+        if (wlBeingCommittedChanges.hasBeingCommitedChanges() &&
+            wlBeingCommittedChanges.getChanges().getEnabledState() != null)
+        {
+            return wlBeingCommittedChanges.getChanges().getEnabledState();
+        }
+        return wlInputContextState.enabled;
+    }
+
+    private Boolean wlGetContextPendingEnabledState() {
+        if (wlPendingChanges2 != null && wlPendingChanges2.getEnabledState() != null) {
+            return wlPendingChanges2.getEnabledState();
+        }
+
+        return (wlPendingChanges1 == null) ? null : wlPendingChanges1.getEnabledState();
+    }
+
+    private boolean wlGetContextLatestFutureEnabledState() {
+        return Objects.requireNonNullElse(wlGetContextPendingEnabledState(), wlGetContextUpcomingOrCurrentEnabledState());
     }
 
 
