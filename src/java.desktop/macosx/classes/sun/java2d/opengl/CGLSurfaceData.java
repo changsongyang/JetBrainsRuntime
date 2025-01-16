@@ -103,6 +103,11 @@ public abstract class CGLSurfaceData extends OGLSurfaceData {
 
     protected native void clearWindow();
 
+    @Override
+    public boolean loadTexture(long pTexture) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
     /**
      * A surface which implements an intermediate buffer between
      * the Java2D flusher thread and the AppKit thread.

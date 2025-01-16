@@ -521,6 +521,12 @@ public class BufImgSurfaceData extends SurfaceData {
             }
         }
     }
+
+    @Override
+    public boolean loadTexture(long pTexture) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
     private static void copyLine(IntBuffer src, int sw, int sh, int[] dst, int dw, int dh, int x0, int y0, int x1) {
         if (x0 < 0 || x0 >= sw || x0 >= dw || x1 <= x0)
             return;

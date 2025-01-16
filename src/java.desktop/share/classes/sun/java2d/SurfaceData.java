@@ -1112,4 +1112,6 @@ public abstract class SurfaceData
     protected void loadNativeRaster(long pRaster, int width, int height, long pRects, int rectsCount) {
         System.err.println("ERROR: loadNativeRaster must be overriden.");
     }
+
+    public abstract boolean loadTexture(long pTexture);
 }

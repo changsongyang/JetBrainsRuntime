@@ -36,10 +36,9 @@ import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import java.awt.image.ImageObserver;
 import java.awt.image.VolatileImage;
-import sun.java2d.SunGraphics2D;
-import sun.java2d.SurfaceManagerFactory;
-import sun.java2d.DestSurfaceProvider;
-import sun.java2d.Surface;
+import com.jetbrains.desktop.NativeRasterLoader;
+
+import sun.java2d.*;
 import sun.java2d.pipe.Region;
 import static sun.java2d.pipe.hw.AccelSurface.*;
 

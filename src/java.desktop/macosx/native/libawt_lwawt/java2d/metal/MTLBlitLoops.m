@@ -230,8 +230,10 @@ replaceTextureRegion(MTLContext *mtlc, id<MTLTexture> dest, const SurfaceDataRas
 
         id<MTLBlitCommandEncoder> blitEncoder = [mtlc.encoderManager createBlitEncoder];
         [blitEncoder copyFromBuffer:buff
-                       sourceOffset:0 sourceBytesPerRow:(sw * srcInfo->pixelStride)
-                sourceBytesPerImage:(sw * sh * srcInfo->pixelStride) sourceSize:MTLSizeMake(sw, sh, 1)
+                       sourceOffset:0
+                  sourceBytesPerRow:(sw * srcInfo->pixelStride)
+                sourceBytesPerImage:(sw * sh * srcInfo->pixelStride)
+                         sourceSize:MTLSizeMake(sw, sh, 1)
                           toTexture:dest
                    destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(dx1, dy1, 0)];
         [blitEncoder endEncoding];

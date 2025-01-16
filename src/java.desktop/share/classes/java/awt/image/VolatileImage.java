@@ -25,6 +25,8 @@
 
 package java.awt.image;
 
+import com.jetbrains.desktop.NativeRasterLoader;
+
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -343,5 +345,16 @@ public abstract class VolatileImage extends Image implements Transparency
      */
     public int getTransparency() {
         return transparency;
+    }
+
+    /**
+     * Loads a texture into a {@code VolatileImage} instance using the native texture pointer.
+     *
+     * @param texturePtr the native pointer to the texture to be loaded. The pointer should reference a valid
+     *                   native texture resource.
+     * @return {@code true} if the texture loading operation was successful, {@code false} otherwise.
+     */
+    public boolean loadTexture(long texturePtr) {
+        return NativeRasterLoader.loadTexture(this, texturePtr);
     }
 }

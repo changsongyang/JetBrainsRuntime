@@ -353,6 +353,74 @@ Java_sun_java2d_metal_MTLSurfaceData_clearWindow
     mtlsdo->layer = NULL;
 }
 
+JNIEXPORT jboolean JNICALL Java_sun_java2d_metal_MTLSurfaceData_loadTextureImpl
+(JNIEnv *env, jclass clazz, jlong sdops, jlong pTexture)
+{
+    J2dTraceLn(J2D_TRACE_INFO, "MTLSurfaceData_loadTextureImpl");
+    if (sdops == 0 || pTexture == 0) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: params are null");
+        return JNI_FALSE;
+    }
+
+    id<MTLTexture> src = (id<MTLTexture>)jlong_to_ptr(pTexture);
+    if (src == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: source texture is null");
+        return JNI_FALSE;
+    }
+
+    BMTLSDOps *dstOps = (BMTLSDOps *)jlong_to_ptr(sdops);
+    id<MTLTexture> dst = dstOps->pTexture;
+    if (dst == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: texture is null");
+        return JNI_FALSE;
+    }
+
+    NSLog(@"Source Texture Format: %lu", src.pixelFormat);
+    NSLog(@"Destination Texture Format: %lu", dst.pixelFormat);
+
+    NSLog(@"Source Texture Size: %lu x %lu", src.width, src.height);
+    NSLog(@"Destination  Texture Size: %lu x %lu", dst.width, dst.height);
+
+    MTLSDOps *dstMTLOps = (MTLSDOps *)dstOps->privOps;
+    MTLContext *ctx = dstMTLOps->configInfo->context;
+    if (ctx == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: context is null");
+        return JNI_FALSE;
+    }
+
+    id<MTLCommandBuffer> commandBuffer = [ctx createCommandBuffer];
+    if (commandBuffer == nil) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: failed to create command buffer");
+        return JNI_FALSE;
+    }
+
+    id<MTLBlitCommandEncoder> blitEncoder = [ctx.encoderManager createBlitEncoder];
+    if (blitEncoder == nil) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLSurfaceData_loadTextureImpl: failed to create blit encoder");
+        [commandBuffer release];
+        return JNI_FALSE;
+    }
+
+    MTLSize textureSize = MTLSizeMake(src.width, src.height, 1);
+    [blitEncoder copyFromTexture:src
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:textureSize
+                       toTexture:dst
+                destinationSlice:0
+                destinationLevel:0
+               destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+    [blitEncoder release];
+    [commandBuffer release];
+
+    J2dTraceLn(J2D_TRACE_INFO, "MTLSurfaceData_loadTextureImpl: texture loaded successfully");
+    return JNI_TRUE;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_sun_java2d_metal_MTLSurfaceData_loadNativeRasterWithRects
         (JNIEnv *env, jclass clazz,

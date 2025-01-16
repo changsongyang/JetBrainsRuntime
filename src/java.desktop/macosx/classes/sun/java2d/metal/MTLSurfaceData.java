@@ -50,8 +50,8 @@ import java.awt.Transparency;
 
 import java.awt.image.ColorModel;
 import java.awt.image.Raster;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import static sun.java2d.pipe.BufferedOpCodes.DISPOSE_SURFACE;
 import static sun.java2d.pipe.BufferedOpCodes.FLUSH_SURFACE;
 import static sun.java2d.pipe.BufferedOpCodes.FLUSH_BUFFER;
 import static sun.java2d.pipe.hw.ContextCapabilities.CAPS_MULTITEXTURE;
@@ -673,5 +673,23 @@ public abstract class MTLSurfaceData extends SurfaceData
         markDirty();
     }
 
+    @Override
+    public boolean loadTexture(long pTexture) {
+        MTLRenderQueue rq = MTLRenderQueue.getInstance();
+        rq.lock();
+        AtomicBoolean result = new AtomicBoolean(false);
+        try {
+            MTLContext.setScratchSurface(getMTLGraphicsConfig());
+            rq.flushAndInvokeNow(() -> {
+                result.set(loadTextureImpl(getNativeOps(), pTexture));
+            });
+        } finally {
+            rq.unlock();
+        }
+
+        return result.get();
+    }
+
     private static native boolean loadNativeRasterWithRects(long sdops, long pRaster, int width, int height, long pRects, int rectsCount);
+    private static native boolean loadTextureImpl(long sdops, long pTexture);
 }

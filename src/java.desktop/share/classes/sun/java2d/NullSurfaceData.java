@@ -156,4 +156,9 @@ public class NullSurfaceData extends SurfaceData {
     public Object getDestination() {
         return null;
     }
+
+    @Override
+    public boolean loadTexture(long pTexture) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

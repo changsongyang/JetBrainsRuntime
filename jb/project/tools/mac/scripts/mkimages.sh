@@ -41,7 +41,7 @@ function do_configure {
     $DISABLE_WARNINGS_AS_ERRORS \
     $STATIC_CONF_ARGS \
     $REPRODUCIBLE_BUILD_OPTS \
-    $WITH_ZIPPED_NATIVE_DEBUG_SYMBOLS \
+    --with-native-debug-symbols=internal \
     || do_exit $?
 }
 
@@ -117,7 +117,7 @@ case "$bundle_type" in
     ;;
   "fd")
     do_reset_changes=1
-    WITH_DEBUG_LEVEL="--with-debug-level=fastdebug"
+    WITH_DEBUG_LEVEL="--with-debug-level=slowdebug"
     RELEASE_NAME=macosx-${CONF_ARCHITECTURE}-server-fastdebug
     JBSDK=macosx-${architecture}-server-release
     ;;

@@ -26,6 +26,7 @@
 package sun.font;
 
 import sun.java2d.SurfaceData;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.awt.GraphicsConfiguration;
 import java.awt.Rectangle;
@@ -67,5 +68,10 @@ class ColorGlyphSurfaceData extends SurfaceData {
     @Override
     public Object getDestination() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean loadTexture(long pTexture) {
+        throw new UnsupportedOperationException("Not implemented");
     }
 }

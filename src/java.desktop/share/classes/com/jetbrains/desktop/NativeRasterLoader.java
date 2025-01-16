@@ -2,10 +2,12 @@ package com.jetbrains.desktop;
 
 import com.jetbrains.exported.JBRApi;
 import sun.awt.image.SunVolatileImage;
+import sun.java2d.Surface;
+import sun.java2d.SurfaceData;
 
 import java.awt.image.VolatileImage;
 
-class NativeRasterLoader {
+public class NativeRasterLoader {
     /**
      * Loads native image raster into VolatileImage
      *
@@ -26,5 +28,18 @@ class NativeRasterLoader {
 
         SunVolatileImage svi = (SunVolatileImage)vi;
         sun.java2d.NativeRasterLoader.loadNativeRaster(svi.getDestSurface(), pRaster, width, height, pRects, rectsCount);
+    }
+
+    public static boolean loadTexture(VolatileImage vi, long pTexture) {
+        if (!(vi instanceof SunVolatileImage)) {
+            System.err.printf("Unsupported type of VolatileImage: %s\n", vi);
+            return false;
+        }
+
+        Surface surface = ((SunVolatileImage) vi).getDestSurface();
+        if (surface instanceof SurfaceData) {
+            return ((SurfaceData)surface).loadTexture(pTexture);
+        }
+        return false;
     }
 }
