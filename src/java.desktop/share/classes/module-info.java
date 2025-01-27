@@ -112,6 +112,9 @@ module java.desktop {
     exports javax.swing.tree;
     exports javax.swing.undo;
 
+    // To be exposed via JBR API
+    exports com.jetbrains.desktop.image;
+
     // qualified exports may be inserted at build time
     // see make/GensrcModuleInfo.gmk
     exports sun.awt to
