@@ -360,3 +360,19 @@ Java_sun_java2d_opengl_CGLGraphicsConfig_nativeGetMaxTextureSize
 
     return (jint)max;
 }
+
+JNIEXPORT jlong JNICALL
+Java_sun_java2d_opengl_CGLGraphicsConfig_getSharedContext
+        (JNIEnv *env, jclass cglgc)
+{
+    J2dTraceLn(J2D_TRACE_INFO, "CGLGraphicsConfig_getSharedContext");
+    return (jlong)sharedContext.CGLContextObj;
+}
+
+JNIEXPORT jlong JNICALL
+Java_sun_java2d_opengl_CGLGraphicsConfig_getSharedPixelFormat
+        (JNIEnv *env, jclass cglgc)
+{
+    J2dTraceLn(J2D_TRACE_INFO, "CGLGraphicsConfig_getSharedPixelFormat");
+    return (jlong)sharedPixelFormat.CGLPixelFormatObj;
+}

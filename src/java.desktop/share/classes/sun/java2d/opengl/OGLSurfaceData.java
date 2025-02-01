@@ -170,6 +170,7 @@ public abstract class OGLSurfaceData extends SurfaceData
                                           boolean isOpaque, boolean texNonPow2,
                                           boolean texRect,
                                           int width, int height);
+    protected native boolean initWithTexture(long pData, boolean isOpaque, long texturePtr);
     protected native boolean initFlipBackbuffer(long pData);
 
     private native int getTextureTarget(long pData);

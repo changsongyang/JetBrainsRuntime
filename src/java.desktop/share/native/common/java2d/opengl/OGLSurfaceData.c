@@ -287,6 +287,71 @@ Java_sun_java2d_opengl_OGLSurfaceData_initTexture
 }
 
 /**
+ * Initializes an OpenGL texture, using the given width and height as
+ * a guide.  See OGLSD_InitTextureObject() for more information.
+ */
+JNIEXPORT jboolean JNICALL
+Java_sun_java2d_opengl_OGLSurfaceData_initWithTexture
+    (JNIEnv *env, jobject oglsd,
+     jlong pData, jboolean isOpaque,
+     jlong textureId)
+{
+    OGLSDOps *oglsdo = (OGLSDOps *)jlong_to_ptr(pData);
+
+    if (oglsdo == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "OGLSurfaceData_initTexture: ops are null");
+        return JNI_FALSE;
+    }
+
+    j2d_glBindTexture(GL_TEXTURE_2D, textureId);
+    GLenum error = j2d_glGetError();
+    if (error != GL_NO_ERROR) {
+        J2dRlsTraceLn2(J2D_TRACE_ERROR,
+            "OGLSurfaceData_initTexture: could not bind texture: id=%d error=%x",
+            textureId, error);
+        return JNI_FALSE;
+    }
+
+    if (!j2d_glIsTexture(textureId)) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "OGLSurfaceData_initTexture: textureId is not a valid texture id");
+        return JNI_FALSE;
+    }
+
+    GLsizei width, height;
+    j2d_glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+    j2d_glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+    j2d_glBindTexture(GL_TEXTURE_2D, 0);
+
+    GLint texMax;
+    j2d_glGetIntegerv(GL_MAX_TEXTURE_SIZE, &texMax);
+    if (width >= texMax || height >= texMax || width <= 0 || height <= 0) {
+        J2dRlsTraceLn2(J2D_TRACE_ERROR,
+            "OGLSurfaceData_initTexture: wrong texture size %d x %d",
+            width, height);
+        return JNI_FALSE;
+    }
+
+    oglsdo->isOpaque = isOpaque;
+    oglsdo->xOffset = 0;
+    oglsdo->yOffset = 0;
+    oglsdo->width = width;
+    oglsdo->height = height;
+    oglsdo->textureID = textureId;
+    oglsdo->textureWidth = width;
+    oglsdo->textureHeight = height;
+    oglsdo->textureTarget = GL_TEXTURE_2D;
+    oglsdo->keepTexture = JNI_TRUE;
+    OGLSD_INIT_TEXTURE_FILTER(oglsdo, GL_NEAREST);
+
+    OGLSD_SetNativeDimensions(env, oglsdo, width, height);
+    oglsdo->drawableType = OGLSD_TEXTURE;
+
+    J2dTraceLn3(J2D_TRACE_VERBOSE, "  wrapped texture: w=%d h=%d id=%d", width, height, textureId);
+
+    return JNI_TRUE;
+}
+
+/**
  * Initializes a framebuffer object based on the given textureID and its
  * width/height.  This method will iterate through all possible depth formats
  * to find one that is supported by the drivers/hardware.  (Since our use of
@@ -667,7 +732,7 @@ OGLSD_Delete(JNIEnv *env, OGLSDOps *oglsdo)
                 oglsdo->drawableType);
 
     if (oglsdo->drawableType == OGLSD_TEXTURE) {
-        if (oglsdo->textureID != 0) {
+        if (oglsdo->textureID != 0 && !oglsdo->keepTexture) {
             j2d_glDeleteTextures(1, &oglsdo->textureID);
             oglsdo->textureID = 0;
         }

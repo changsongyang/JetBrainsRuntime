@@ -29,6 +29,7 @@ import java.awt.GraphicsConfiguration;
 import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.image.ColorModel;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import sun.java2d.SurfaceData;
 
@@ -84,6 +85,10 @@ public abstract class CGLSurfaceData extends OGLSurfaceData {
     public static CGLOffScreenSurfaceData createData(CGLGraphicsConfig gc,
             int width, int height, ColorModel cm, Image image, int type) {
         return new CGLOffScreenSurfaceData(gc, width, height, image, cm, type);
+    }
+
+    public static CGLTextureWrapperSurfaceData createData(CGLGraphicsConfig gc, Image image, long textureId) {
+        return new CGLTextureWrapperSurfaceData(gc, image, textureId);
     }
 
     @Override
@@ -175,6 +180,48 @@ public abstract class CGLSurfaceData extends OGLSurfaceData {
         @Override
         public Object getDestination() {
             return offscreenImage;
+        }
+    }
+
+    public static class CGLTextureWrapperSurfaceData extends CGLSurfaceData {
+        private final Image image;
+
+        private CGLTextureWrapperSurfaceData(CGLGraphicsConfig gc, Image image, long textureId) {
+            super(null, gc, ColorModel.getRGBdefault(), RT_TEXTURE, 0, 0);
+            if (!isTexNonPow2Available()) {
+                throw new UnsupportedOperationException("Non-power-of-two texture dimensions are not supported");
+            }
+            this.image = image;
+
+            OGLRenderQueue rq = OGLRenderQueue.getInstance();
+            rq.lock();
+
+            AtomicBoolean success = new AtomicBoolean(false);
+            try {
+                OGLContext.setScratchSurface(gc);
+                rq.flushAndInvokeNow(() -> success.set(initWithTexture(getNativeOps(), false, textureId)));
+            } finally {
+                rq.unlock();
+            }
+
+            if (!success.get()) {
+                throw new IllegalArgumentException("Failed to initialize CGLTextureWrapperSurfaceData");
+            }
+        }
+
+        @Override
+        public SurfaceData getReplacement() {
+            throw new UnsupportedOperationException("not supported");
+        }
+
+        @Override
+        public Object getDestination() {
+            return image;
+        }
+
+        @Override
+        public Rectangle getBounds() {
+            return getNativeBounds();
         }
     }
 }

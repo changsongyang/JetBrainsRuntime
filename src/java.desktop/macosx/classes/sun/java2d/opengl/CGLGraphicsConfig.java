@@ -90,7 +90,8 @@ public final class CGLGraphicsConfig extends CGraphicsConfig
      * @return GL_MAX_TEXTURE_SIZE
      */
     private static native int nativeGetMaxTextureSize();
-
+    public static native long getSharedContext();
+    public static native long getSharedPixelFormat();
     static {
         cglAvailable = initCGL();
     }

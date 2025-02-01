@@ -30,6 +30,8 @@ import sun.awt.image.SurfaceManager;
 import sun.java2d.SurfaceData;
 import sun.java2d.metal.MTLGraphicsConfig;
 import sun.java2d.metal.MTLSurfaceData;
+import sun.java2d.opengl.CGLGraphicsConfig;
+import sun.java2d.opengl.CGLSurfaceData;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -79,12 +81,35 @@ public class TextureWrapperImage extends Image {
     }
 
     @JBRApi.Provides("SharedTextures")
-    public static int getTextureType(GraphicsConfiguration gc) {
+    public static int getTextureType() {
+        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         if (gc instanceof MTLGraphicsConfig) {
             return 1;
+        } if (gc instanceof CGLGraphicsConfig) {
+            return 2;
         }
 
         return 0;
+    }
+
+    @JBRApi.Provides("SharedTextures")
+    public static long getSharedOpenGLContext() {
+        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        if (gc instanceof CGLGraphicsConfig) {
+            return CGLGraphicsConfig.getSharedContext();
+        }
+
+        throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
+    }
+
+    @JBRApi.Provides("SharedTextures")
+    public static long getSharedOpenGLContextPixelFormat() {
+        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        if (gc instanceof CGLGraphicsConfig) {
+            return CGLGraphicsConfig.getSharedPixelFormat();
+        }
+
+        throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
     }
 
     @Override
@@ -128,10 +153,13 @@ public class TextureWrapperImage extends Image {
     private static class TextureWrapperSurfaceManager extends SurfaceManager {
         private final SurfaceData sd;
 
-        public TextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long pTexture) throws IllegalArgumentException {
+        public TextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) throws IllegalArgumentException {
             if (gc instanceof MTLGraphicsConfig) {
-                sd = MTLSurfaceData.createData((MTLGraphicsConfig) gc, image, pTexture);
-            } else {
+                sd = MTLSurfaceData.createData((MTLGraphicsConfig) gc, image, texture);
+            } else if (gc instanceof CGLGraphicsConfig) {
+                sd = CGLSurfaceData.createData((CGLGraphicsConfig) gc, image, texture);
+            }
+            else {
                 throw new IllegalArgumentException("Unsupported GraphicsConfiguration");
             }
         }
