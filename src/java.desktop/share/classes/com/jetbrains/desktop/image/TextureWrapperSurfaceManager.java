@@ -27,10 +27,6 @@ package com.jetbrains.desktop.image;
 
 import sun.awt.image.SurfaceManager;
 import sun.java2d.SurfaceData;
-import sun.java2d.metal.MTLGraphicsConfig;
-import sun.java2d.metal.MTLSurfaceData;
-import sun.java2d.opengl.CGLGraphicsConfig;
-import sun.java2d.opengl.CGLSurfaceData;
 
 import java.awt.*;
 
@@ -49,5 +45,10 @@ public class TextureWrapperSurfaceManager extends SurfaceManager {
     @Override
     public SurfaceData restoreContents() {
         return sd;
+    }
+
+    @Override
+    public ImageCapabilities getCapabilities(GraphicsConfiguration gc) {
+        return new ImageCapabilities(true);
     }
 }
