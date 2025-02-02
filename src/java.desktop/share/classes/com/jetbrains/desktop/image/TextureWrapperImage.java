@@ -29,8 +29,6 @@ import com.jetbrains.exported.JBRApi;
 import sun.awt.image.SurfaceManager;
 import sun.java2d.SurfaceData;
 import sun.java2d.SurfaceManagerFactory;
-import sun.java2d.metal.MTLGraphicsConfig;
-import sun.java2d.opengl.CGLGraphicsConfig;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -81,11 +79,19 @@ public class TextureWrapperImage extends Image {
 
     @JBRApi.Provides("SharedTextures")
     public static int getTextureType() {
-        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        if (gc instanceof MTLGraphicsConfig) {
-            return 1;
-        } if (gc instanceof CGLGraphicsConfig) {
-            return 2;
+        GraphicsConfiguration gc = GraphicsEnvironment
+                .getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice()
+                .getDefaultConfiguration();
+        try {
+            if (isInstanceOf(gc, "sun.java2d.metal.MTLGraphicsConfig")) {
+                return 1;
+            }
+            if (isInstanceOf(gc, "sun.java2d.opengl.CGLGraphicsConfig")) {
+                return 2;
+            }
+        } catch (Exception e) {
+            throw new InternalError("Unexpected exception during reflection", e);
         }
 
         return 0;
@@ -93,22 +99,45 @@ public class TextureWrapperImage extends Image {
 
     @JBRApi.Provides("SharedTextures")
     public static long getSharedOpenGLContext() {
-        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        if (gc instanceof CGLGraphicsConfig) {
-            return CGLGraphicsConfig.getSharedContext();
-        }
+        try {
+            GraphicsConfiguration gc = GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice()
+                    .getDefaultConfiguration();
 
-        throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
+            var cglGraphicsConfigClass = Class.forName("sun.java2d.opengl.CGLGraphicsConfig");
+            if (cglGraphicsConfigClass.isInstance(gc)) {
+                return (long) cglGraphicsConfigClass.getMethod("getSharedContext").invoke(gc);
+            }
+
+            throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
+        } catch (ClassNotFoundException e) {
+            throw new UnsupportedOperationException("Unsupported GraphicsConfiguration", e);
+        } catch (Exception e) {
+            throw new InternalError("Unexpected exception during reflection", e);
+        }
     }
 
     @JBRApi.Provides("SharedTextures")
     public static long getSharedOpenGLContextPixelFormat() {
-        var gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        if (gc instanceof CGLGraphicsConfig) {
-            return CGLGraphicsConfig.getSharedPixelFormat();
-        }
+        try {
+            GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice()
+                    .getDefaultConfiguration();
 
-        throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
+            var cglGraphicsConfigClass = Class.forName("sun.java2d.opengl.CGLGraphicsConfig");
+            if (cglGraphicsConfigClass.isInstance(gc)) {
+                return (long) cglGraphicsConfigClass
+                        .getMethod("getSharedPixelFormat")
+                        .invoke(gc);
+            }
+
+            throw new UnsupportedOperationException("Unsupported GraphicsConfiguration");
+        } catch (ClassNotFoundException e) {
+            throw new UnsupportedOperationException("Unsupported GraphicsConfiguration", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Unexpected exception during reflection", e);
+        }
     }
 
     @Override
@@ -147,5 +176,14 @@ public class TextureWrapperImage extends Image {
     @Override
     public ImageCapabilities getCapabilities(GraphicsConfiguration gc) {
         return capabilities;
+    }
+
+    private static boolean isInstanceOf(Object obj, String className) {
+        try {
+            var clazz = Class.forName(className);
+            return clazz.isInstance(obj);
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }
