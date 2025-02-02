@@ -28,10 +28,9 @@ package com.jetbrains.desktop.image;
 import com.jetbrains.exported.JBRApi;
 import sun.awt.image.SurfaceManager;
 import sun.java2d.SurfaceData;
+import sun.java2d.SurfaceManagerFactory;
 import sun.java2d.metal.MTLGraphicsConfig;
-import sun.java2d.metal.MTLSurfaceData;
 import sun.java2d.opengl.CGLGraphicsConfig;
-import sun.java2d.opengl.CGLSurfaceData;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -70,7 +69,7 @@ public class TextureWrapperImage extends Image {
     public TextureWrapperImage(GraphicsConfiguration gc, long texture)
             throws UnsupportedOperationException, IllegalArgumentException {
         this.gc = gc;
-        SurfaceManager surfaceManager = new TextureWrapperSurfaceManager(gc, this, texture);
+        SurfaceManager surfaceManager = SurfaceManagerFactory.getInstance().createTextureWrapperSurfaceManager(gc, this, texture);
         sd = surfaceManager.getPrimarySurfaceData();
         SurfaceManager.setManager(this, surfaceManager);
     }
@@ -148,30 +147,5 @@ public class TextureWrapperImage extends Image {
     @Override
     public ImageCapabilities getCapabilities(GraphicsConfiguration gc) {
         return capabilities;
-    }
-
-    private static class TextureWrapperSurfaceManager extends SurfaceManager {
-        private final SurfaceData sd;
-
-        public TextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) throws IllegalArgumentException {
-            if (gc instanceof MTLGraphicsConfig) {
-                sd = MTLSurfaceData.createData((MTLGraphicsConfig) gc, image, texture);
-            } else if (gc instanceof CGLGraphicsConfig) {
-                sd = CGLSurfaceData.createData((CGLGraphicsConfig) gc, image, texture);
-            }
-            else {
-                throw new IllegalArgumentException("Unsupported GraphicsConfiguration");
-            }
-        }
-
-        @Override
-        public SurfaceData getPrimarySurfaceData() {
-            return sd;
-        }
-
-        @Override
-        public SurfaceData restoreContents() {
-            return sd;
-        }
     }
 }
