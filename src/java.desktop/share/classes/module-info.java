@@ -112,6 +112,8 @@ module java.desktop {
     exports javax.swing.tree;
     exports javax.swing.undo;
 
+    exports com.jetbrains.desktop.image;
+
     // qualified exports may be inserted at build time
     // see make/GensrcModuleInfo.gmk
     exports sun.awt to

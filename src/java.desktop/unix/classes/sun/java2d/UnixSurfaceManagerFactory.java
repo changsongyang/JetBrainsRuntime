@@ -28,7 +28,9 @@ package sun.java2d;
 
 import java.awt.*;
 
+import com.jetbrains.desktop.image.AcceleratedImage;
 import sun.awt.X11GraphicsConfig;
+import sun.awt.image.AcceleratedImageSurfaceManager;
 import sun.awt.image.SunVolatileImage;
 import sun.awt.image.SurfaceManager;
 import sun.awt.image.VolatileSurfaceManager;
@@ -74,8 +76,13 @@ public class UnixSurfaceManagerFactory extends SurfaceManagerFactory {
         }
     }
 
+//    @Override
+//    public SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) {
+//        throw new UnsupportedOperationException("unsupported");
+//    }
+
     @Override
-    public SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) {
+    public AcceleratedImageSurfaceManager createAcceleratedImageSurfaceManager(GraphicsConfiguration gc, AcceleratedImage image) {
         throw new UnsupportedOperationException("unsupported");
     }
 }

@@ -23,17 +23,14 @@
  * questions.
  */
 
-package com.jetbrains.desktop.image;
+package sun.awt.image;
 
-import sun.awt.image.SurfaceManager;
 import sun.java2d.SurfaceData;
 
-import java.awt.*;
-
-public class TextureWrapperSurfaceManager extends SurfaceManager {
+public abstract class AcceleratedImageSurfaceManager extends SurfaceManager {
     private final SurfaceData sd;
 
-    public TextureWrapperSurfaceManager(SurfaceData sd) throws IllegalArgumentException {
+    public AcceleratedImageSurfaceManager(SurfaceData sd) {
         this.sd = sd;
     }
 
@@ -47,8 +44,5 @@ public class TextureWrapperSurfaceManager extends SurfaceManager {
         return sd;
     }
 
-    @Override
-    public ImageCapabilities getCapabilities(GraphicsConfiguration gc) {
-        return new ImageCapabilities(true);
-    }
+    public abstract long getNativeTexture();
 }

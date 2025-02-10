@@ -25,6 +25,8 @@
 
 package sun.java2d;
 
+import com.jetbrains.desktop.image.AcceleratedImage;
+import sun.awt.image.AcceleratedImageSurfaceManager;
 import sun.awt.image.SunVolatileImage;
 import sun.awt.image.SurfaceManager;
 import sun.awt.image.VolatileSurfaceManager;
@@ -92,5 +94,7 @@ public abstract class SurfaceManagerFactory {
      public abstract VolatileSurfaceManager
          createVolatileManager(SunVolatileImage image, Object context);
 
-     public abstract SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture);
+//     public abstract SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture);
+
+     public abstract AcceleratedImageSurfaceManager createAcceleratedImageSurfaceManager(GraphicsConfiguration gc, AcceleratedImage image);
 }

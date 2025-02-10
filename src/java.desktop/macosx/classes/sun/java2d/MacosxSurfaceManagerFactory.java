@@ -25,8 +25,10 @@
 
 package sun.java2d;
 
-import com.jetbrains.desktop.image.TextureWrapperSurfaceManager;
+import com.jetbrains.desktop.image.AcceleratedImage;
+//import com.jetbrains.desktop.image.TextureWrapperSurfaceManager;
 import sun.awt.CGraphicsEnvironment;
+import sun.awt.image.AcceleratedImageSurfaceManager;
 import sun.awt.image.SunVolatileImage;
 import sun.awt.image.SurfaceManager;
 import sun.awt.image.VolatileSurfaceManager;
@@ -36,6 +38,7 @@ import sun.java2d.metal.MTLVolatileSurfaceManager;
 import sun.java2d.opengl.CGLGraphicsConfig;
 import sun.java2d.opengl.CGLSurfaceData;
 import sun.java2d.opengl.CGLVolatileSurfaceManager;
+import sun.java2d.pipe.hw.AccelSurface;
 
 import java.awt.*;
 
@@ -63,17 +66,41 @@ public class MacosxSurfaceManagerFactory extends SurfaceManagerFactory {
                 new CGLVolatileSurfaceManager(vImg, context);
     }
 
+//    @Override
+//    public SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) {
+//        SurfaceData sd;
+//        if (gc instanceof MTLGraphicsConfig) {
+//            sd = MTLSurfaceData.createData((MTLGraphicsConfig) gc, image, texture);
+//        } else if (gc instanceof CGLGraphicsConfig) {
+//            sd = CGLSurfaceData.createData((CGLGraphicsConfig) gc, image, texture);
+//        }
+//        else {
+//            throw new IllegalArgumentException("Unsupported GraphicsConfiguration");
+//        }
+//        return new TextureWrapperSurfaceManager(sd);
+//    }
+//
     @Override
-    public SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long texture) {
-        SurfaceData sd;
+    public AcceleratedImageSurfaceManager createAcceleratedImageSurfaceManager(GraphicsConfiguration gc, AcceleratedImage image) {
+        final MTLSurfaceData.MTLOffScreenSurfaceData sd;
         if (gc instanceof MTLGraphicsConfig) {
-            sd = MTLSurfaceData.createData((MTLGraphicsConfig) gc, image, texture);
-        } else if (gc instanceof CGLGraphicsConfig) {
-            sd = CGLSurfaceData.createData((CGLGraphicsConfig) gc, image, texture);
-        }
-        else {
+            sd = MTLSurfaceData.createData(
+                    (MTLGraphicsConfig) gc,
+                    image.getWidth(null),
+                    image.getHeight(null),
+                    gc.getColorModel(image.getTransparency()),
+                    image,
+                    AccelSurface.RT_TEXTURE
+            );
+        } else {
             throw new IllegalArgumentException("Unsupported GraphicsConfiguration");
         }
-        return new TextureWrapperSurfaceManager(sd);
+
+        return new AcceleratedImageSurfaceManager(sd) {
+            @Override
+            public long getNativeTexture() {
+                return sd.getNativeResource(AccelSurface.TEXTURE);
+            }
+        };
     }
 }
