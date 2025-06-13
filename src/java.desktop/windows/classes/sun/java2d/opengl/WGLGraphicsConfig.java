@@ -460,5 +460,12 @@ public final class WGLGraphicsConfig
     public Image wrapTextureImage(long texture) {
         return new TextureWrapperImage(this, texture);
     }
-}
+
+    @Override
+    public SurfaceManager createTextureWrapperSurfaceManager(GraphicsConfiguration gc, Image image, long textureId) {
+        if (gc instanceof WGLGraphicsConfig) {
+            return new TextureWrapperSurfaceManager(WGLSurfaceData.createData((WGLGraphicsConfig) gc, image, textureId));
+        }
+        throw new UnsupportedOperationException("Not supported");
+    }
 }
