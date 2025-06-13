@@ -299,6 +299,38 @@ public final class WLInputMethod extends InputMethodAdapter {
                 this.nativeContextPtr = nativeContextPtr;
             }
 
+
+            /** @return 0 if the input context hasn't entered a surface yet. Otherwise, the native pointer to the surface. */
+            public long getCurrentWlSurfacePtr() {
+                return currentWlSurfacePtr;
+            }
+
+
+            /**
+             * Notifies the InputContext that a set of changes has been sent and committed to the compositor
+             *   via a {@code zwp_text_input_v3::commit} request. The InputContext reacts by incrementing its commit counter.
+             *
+             * @param changes represents the set of changes that have been sent and followed by a 'commit' request.
+             *                Must not be {@code null} (but can be empty, which means only the 'commit' request has been issued).
+             *
+             * @return a new instance of {@link OutgoingBeingCommittedChanges} consisting of
+             *         the passed changes and the new value of the commit counter.
+             *
+             * @throws NullPointerException if {@code changes} is {@code null}.
+             *
+             * @see OutgoingChanges
+             */
+            public OutgoingBeingCommittedChanges syncWithCommittedOutgoingChanges(final OutgoingChanges changes) {
+                Objects.requireNonNull(changes, "changes");
+
+                // zwp_text_input_v3::done natively uses uint32_t for the serial,
+                //   so it can't get greater than 0xFFFFFFFF.
+                this.commitCounter = (this.commitCounter + 1) % 0x100000000L;
+
+                return new OutgoingBeingCommittedChanges(changes, this.commitCounter);
+            }
+
+
             /**
              * This class represents the extended state of an {@code InputContext} that only exists when the context
              *   is enabled.
@@ -485,6 +517,23 @@ public final class WLInputMethod extends InputMethodAdapter {
             }
 
             public Rectangle getCursorRectangle() { return newCursorRectangle; }
+
+
+            public OutgoingChanges appendChangesFrom(OutgoingChanges src) {
+                if (src == null) return this;
+
+                if (getTextChangeCause() == null) {
+                    setTextChangeCause(src.getTextChangeCause());
+                }
+                if (getContentTypeHint() == null) {
+                    setContentType(src.getContentTypeHint(), src.getContentTypePurpose());
+                }
+                if (getCursorRectangle() == null) {
+                    setCursorRectangle(src.getCursorRectangle());
+                }
+
+                return this;
+            }
         }
 
         /**
@@ -736,6 +785,10 @@ public final class WLInputMethod extends InputMethodAdapter {
 
     /** The reference must only be (directly) modified in {@link #wlInitializeContext()} and {@link #wlDisposeContext()}. */
     private ZwpTextInputV3.InputContext wlInputContextState = null;
+    /** Accumulates changes to be sent. {@code null} means there are no changes to send yet. */
+    private ZwpTextInputV3.OutgoingChanges wlPendingChanges = null;
+    /** Changes that have been committed but not yet applied by the compositor. {@code null} means there are no such changes at the moment. */
+    private ZwpTextInputV3.OutgoingBeingCommittedChanges wlBeingCommittedChanges = null;
 
 
     /* Wayland-side methods section */
@@ -744,6 +797,8 @@ public final class WLInputMethod extends InputMethodAdapter {
 
     private void wlInitializeContext() throws AWTException {
         assert(wlInputContextState == null);
+        assert(wlPendingChanges == null);
+        assert(wlBeingCommittedChanges == null);
 
         long nativeCtxPtr = 0;
 
@@ -768,10 +823,98 @@ public final class WLInputMethod extends InputMethodAdapter {
         final var ctxToDispose = this.wlInputContextState;
 
         wlInputContextState = null;
+        wlPendingChanges = null;
+        wlBeingCommittedChanges = null;
 
         if (ctxToDispose != null && ctxToDispose.nativeContextPtr != 0) {
             disposeNativeContext(ctxToDispose.nativeContextPtr);
         }
+    }
+
+
+    /**
+     * This method determines whether any of the pending state changes can be sent and committed.
+     */
+    private boolean wlCanSendChangesNow() {
+        return wlInputContextState != null &&
+               wlInputContextState.nativeContextPtr != 0 &&
+               wlBeingCommittedChanges == null;
+    }
+
+    /**
+     * Transforms the pending set of changes into a series of corresponding zwp_text_input_v3 requests
+     *   followed by a {@code zwp_text_input_v3::commit} request.
+     */
+    private void wlSendPendingChangesNow() {
+        assert(wlCanSendChangesNow());
+
+        final ZwpTextInputV3.OutgoingChanges changesToSend = wlPendingChanges;
+        wlPendingChanges = null;
+
+        if (wlInputContextState.getCurrentWlSurfacePtr() == 0) {
+            // "After leave event, compositor must ignore requests from any text input instances until next enter event."
+            // Thus, it doesn't make sense to send any requests, let's drop the change set.
+
+            if (log.isLoggable(PlatformLogger.Level.FINE)) {
+                log.fine("wlSendPendingChangesNow: wlInputContextState.getCurrentWlSurfacePtr()=0. Dropping the change set {0}", changesToSend);
+            }
+
+            return;
+        }
+
+        // TODO: make sure the current AWT component belongs to the surface wlInputContextState.getCurrentWlSurfacePtr()
+
+        if (log.isLoggable(PlatformLogger.Level.FINER)) {
+            log.finer("wlSendPendingChangesNow: sending the change set: {0}.", changesToSend);
+        }
+
+        if (changesToSend != null) {
+            if (Boolean.TRUE.equals(changesToSend.getEnabledState())) {
+                // TODO: check whether this WLInputMethod is actually activated
+                zwp_text_input_v3_enable(wlInputContextState.nativeContextPtr);
+            }
+
+            if (changesToSend.getTextChangeCause() != null) {
+                zwp_text_input_v3_set_text_change_cause(wlInputContextState.nativeContextPtr,
+                                                        changesToSend.getTextChangeCause().intValue);
+            }
+
+            if (changesToSend.getContentTypeHint() != null && changesToSend.getContentTypePurpose() != null) {
+                zwp_text_input_v3_set_content_type(wlInputContextState.nativeContextPtr,
+                                                   changesToSend.getContentTypeHint(),
+                                                   changesToSend.getContentTypePurpose().intValue);
+            }
+
+            if (changesToSend.getCursorRectangle() != null) {
+                zwp_text_input_v3_set_cursor_rectangle(wlInputContextState.nativeContextPtr,
+                                                       changesToSend.getCursorRectangle().x,
+                                                       changesToSend.getCursorRectangle().y,
+                                                       changesToSend.getCursorRectangle().width,
+                                                       changesToSend.getCursorRectangle().height);
+            }
+
+            if (Boolean.FALSE.equals(changesToSend.getEnabledState())) {
+                zwp_text_input_v3_disable(wlInputContextState.nativeContextPtr);
+            }
+        }
+
+        zwp_text_input_v3_commit(wlInputContextState.nativeContextPtr);
+
+        wlBeingCommittedChanges = wlInputContextState.syncWithCommittedOutgoingChanges(changesToSend);
+    }
+
+    /**
+     * Schedules a new set of changes for sending (but doesn't send them).
+     *
+     * @see #wlSendPendingChangesNow()
+     * @see #wlCanSendChangesNow()
+     */
+    private void wlScheduleContextNewChanges(final ZwpTextInputV3.OutgoingChanges newOutgoingChanges) {
+        if (newOutgoingChanges == null) {
+            return;
+        }
+
+        this.wlPendingChanges = newOutgoingChanges.appendChangesFrom(this.wlPendingChanges);
     }
 
 
@@ -825,5 +968,9 @@ public final class WLInputMethod extends InputMethodAdapter {
     /** Called in response to {@code zwp_text_input_v3::done} events. */
     private void zwp_text_input_v3_onDone(long doneSerial) {
         assert EventQueue.isDispatchThread();
+
+        if (wlPendingChanges != null && wlInputContextState.getCurrentWlSurfacePtr() != 0 && wlCanSendChangesNow()) {
+            wlSendPendingChangesNow();
+        }
     }
 }
