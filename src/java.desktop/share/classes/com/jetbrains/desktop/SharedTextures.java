@@ -28,10 +28,18 @@ package com.jetbrains.desktop;
 import com.jetbrains.desktop.image.TextureWrapperImage;
 import com.jetbrains.exported.JBRApi;
 import sun.awt.SunToolkit;
+import sun.awt.image.SunVolatileImage;
+import sun.awt.image.SurfaceManager;
+import sun.awt.image.VolatileSurfaceManager;
+import sun.java2d.SurfaceData;
 
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
+import java.awt.image.VolatileImage;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.function.Function;
 
 @JBRApi.Service
 @JBRApi.Provides("SharedTextures")
@@ -40,16 +48,26 @@ public class SharedTextures {
     public final static int OPENGL_TEXTURE_TYPE = 2;
 
     private final int textureType;
+    private final Method textureGetter;
 
-    public static SharedTextures create() {
+    public static SharedTextures create() throws ClassNotFoundException, NoSuchMethodException {
         return new SharedTextures();
     }
 
-    private SharedTextures() {
+    private SharedTextures() throws ClassNotFoundException, NoSuchMethodException {
         textureType = getTextureTypeImpl();
         if (textureType == 0) {
             throw new JBRApi.ServiceNotAvailableException();
         }
+
+        String className = switch (textureType) {
+            case METAL_TEXTURE_TYPE -> "sun.java2d.metal.MTLSurfaceDataExt";
+            case OPENGL_TEXTURE_TYPE -> "sun.java2d.opengl.OGLSurfaceDataExt";
+            default -> throw new InternalError("Unexpected texture type: " + textureType);
+        };
+
+        Class<?> clazz = Class.forName(className);
+        textureGetter = clazz.getMethod("getTexture", SurfaceData.class);
     }
 
     public int getTextureType() {
@@ -84,5 +102,16 @@ public class SharedTextures {
 
     public int getGLPixelFormat(GraphicsConfiguration gc) {
         return gc.getPixelFormat();
+    }
+
+    long getTexture(VolatileImage volatileImage) {
+        VolatileSurfaceManager sm = (VolatileSurfaceManager) SurfaceManager.getManager(volatileImage);
+        SurfaceData sd = sm.getPrimarySurfaceData();
+        try {
+            return (Long) textureGetter.invoke(null, sd);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new InternalError("Failed to call " +
+                    textureGetter.getDeclaringClass().getName() + "." + textureGetter.getName(), e);
+        }
     }
 }
