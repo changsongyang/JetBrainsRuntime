@@ -282,7 +282,7 @@ public class WLComponentPeer implements ComponentPeer {
         return false;
     }
 
-    private static Window getToplevelFor(Component component) {
+    static Window getToplevelFor(Component component) {
         Container container = component instanceof Container c ? c : component.getParent();
         for (Container p = container; p != null; p = p.getParent()) {
             if (p instanceof Window window && !isWlPopup(window)) {
