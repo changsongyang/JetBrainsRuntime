@@ -39,32 +39,13 @@ public class SharedTextures {
     public final static int METAL_TEXTURE_TYPE = 1;
     public final static int OPENGL_TEXTURE_TYPE = 2;
 
-    private final int textureType;
-
     public static SharedTextures create() {
         return new SharedTextures();
     }
 
-    private SharedTextures() {
-        textureType = getTextureTypeImpl();
-        if (textureType == 0) {
-            throw new JBRApi.ServiceNotAvailableException();
-        }
-    }
+    private SharedTextures() {}
 
-    public int getTextureType() {
-        return textureType;
-    }
-
-    public Image wrapTexture(GraphicsConfiguration gc, long texture) {
-        return new TextureWrapperImage(gc, texture);
-    }
-
-    private static int getTextureTypeImpl() {
-        GraphicsConfiguration gc = GraphicsEnvironment
-                .getLocalGraphicsEnvironment()
-                .getDefaultScreenDevice()
-                .getDefaultConfiguration();
+    public int getTextureType(GraphicsConfiguration gc) {
         try {
             if (SunToolkit.isInstanceOf(gc, "sun.java2d.metal.MTLGraphicsConfig")) {
                 return METAL_TEXTURE_TYPE;
@@ -76,6 +57,18 @@ public class SharedTextures {
         }
 
         return 0;
+    }
+
+    public int getTextureType() {
+        GraphicsConfiguration gc = GraphicsEnvironment
+                .getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice()
+                .getDefaultConfiguration();
+        return getTextureType(gc);
+    }
+
+    public Image wrapTexture(GraphicsConfiguration gc, long texture) {
+        return new TextureWrapperImage(gc, texture);
     }
 
     public long getSharedGLContext(GraphicsConfiguration gc) {

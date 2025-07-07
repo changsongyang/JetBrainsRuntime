@@ -466,6 +466,6 @@ public final class WGLGraphicsConfig
         if (gc instanceof WGLGraphicsConfig) {
             return new TextureWrapperSurfaceManager(WGLSurfaceData.createData((WGLGraphicsConfig) gc, image, textureId));
         }
-        throw new UnsupportedOperationException("Not supported");
+        throw new UnsupportedOperationException();
     }
 }
