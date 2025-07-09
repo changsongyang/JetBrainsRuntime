@@ -37,6 +37,7 @@ import sun.awt.Win32GraphicsConfig;
 import sun.awt.Win32GraphicsDevice;
 import sun.awt.image.SunVolatileImage;
 import sun.awt.image.SurfaceManager;
+import sun.awt.image.TextureWrapperSurfaceManager;
 import sun.awt.image.VolatileSurfaceManager;
 import sun.awt.windows.WComponentPeer;
 import sun.java2d.Disposer;
@@ -58,7 +59,7 @@ import static sun.java2d.opengl.WGLSurfaceData.WGLVSyncOffScreenSurfaceData;
 
 public final class WGLGraphicsConfig
     extends Win32GraphicsConfig
-    implements OGLGraphicsConfig
+    implements OGLGraphicsConfig, SurfaceManager.TextureWrapperFactory
 {
     protected static boolean wglAvailable;
     private static ImageCapabilities imageCaps = new WGLImageCaps();

@@ -400,7 +400,7 @@ jboolean JNICALL Java_sun_java2d_opengl_OGLSurfaceData_initWithTexture
     j2d_glBindTexture(GL_TEXTURE_2D, textureId);
     GLenum error = j2d_glGetError();
     if (error != GL_NO_ERROR) {
-        J2dRlsTraceLn2(J2D_TRACE_ERROR,
+        J2dRlsTraceLn(J2D_TRACE_ERROR,
             "OGLSurfaceData_initWithTexture: could not bind texture: id=%d error=%x",
             textureId, error);
         return JNI_FALSE;
@@ -420,7 +420,7 @@ jboolean JNICALL Java_sun_java2d_opengl_OGLSurfaceData_initWithTexture
     GLint texMax;
     j2d_glGetIntegerv(GL_MAX_TEXTURE_SIZE, &texMax);
     if (width >= texMax || height >= texMax || width <= 0 || height <= 0) {
-        J2dRlsTraceLn2(J2D_TRACE_ERROR,
+        J2dRlsTraceLn(J2D_TRACE_ERROR,
             "OGLSurfaceData_initWithTexture: wrong texture size %d x %d",
             width, height);
         return JNI_FALSE;
@@ -440,7 +440,7 @@ jboolean JNICALL Java_sun_java2d_opengl_OGLSurfaceData_initWithTexture
     OGLSD_SetNativeDimensions(env, oglsdo, width, height);
     oglsdo->drawableType = OGLSD_TEXTURE;
 
-    J2dTraceLn3(J2D_TRACE_VERBOSE, "OGLSurfaceData_initWithTexture: wrapped texture: w=%d h=%d id=%d", width, height, textureId);
+    J2dTraceLn(J2D_TRACE_VERBOSE, "OGLSurfaceData_initWithTexture: wrapped texture: w=%d h=%d id=%d", width, height, textureId);
 
     return JNI_TRUE;
 }
