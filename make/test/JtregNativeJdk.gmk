@@ -97,12 +97,15 @@ ifeq ($(call isTargetOs, macosx), true)
       -framework Cocoa -framework SystemConfiguration
   BUILD_JDK_JTREG_LIBRARIES_LIBS_libSharedTexturesTest := \
       -framework Cocoa -framework Metal
+  BUILD_JDK_JTREG_EXCLUDE += libSharedTexturesTest.c
 else
   BUILD_JDK_JTREG_EXCLUDE += libTestMainKeyWindow.m
   BUILD_JDK_JTREG_EXCLUDE += libTestDynamicStore.m
   BUILD_JDK_JTREG_EXCLUDE += exeJniInvocationTest.c
   BUILD_JDK_JTREG_EXCLUDE += exeLibraryCache.c
   BUILD_JDK_JTREG_EXCLUDE += libSharedTexturesTest.m
+  BUILD_JDK_JTREG_LIBRARIES_LIBS_libSharedTexturesTest := opengl32.lib
+
 endif
 
 ifeq ($(OPENJDK_TARGET_OS), windows)

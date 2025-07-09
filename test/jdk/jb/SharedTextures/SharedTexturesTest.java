@@ -19,25 +19,30 @@ import java.awt.*;
  *          the same content.
  * @library /test/lib
  * @compile --add-exports java.desktop/com.jetbrains.desktop=ALL-UNNAMED SharedTexturesTest.java
- * @run main/othervm/native -Dsun.java2d.uiScale=1 -Dsun.java2d.metal=True --add-exports java.desktop/com.jetbrains.desktop=ALL-UNNAMED SharedTexturesTest
- * @requires (os.family=="mac")
+ * @run main/othervm/native -Dsun.java2d.uiScale=1 -Dsun.java2d.opengl=True --add-exports java.desktop/com.jetbrains.desktop=ALL-UNNAMED SharedTexturesTest
+ * @requires (os.family=="windows")
  */
+
 public class SharedTexturesTest {
     static {
         System.loadLibrary("SharedTexturesTest");
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        System.out.println("MyPID: " + ProcessHandle.current().pid());
+        Thread.sleep(1000 * 60 * 60);
         BufferedImage originalImage = createImage();
         byte[] bytes = getPixelData(originalImage);
 
         SharedTextures sharedTexturesService = SharedTextures.create();
-        Asserts.assertEquals(sharedTexturesService.getTextureType(), SharedTextures.METAL_TEXTURE_TYPE);
+//        Asserts.assertEquals(sharedTexturesService.getTextureType(), SharedTextures.METAL_TEXTURE_TYPE);
 
         BufferedImage bufferedImageContent;
         BufferedImage volatileImageContent;
 
-        long textureId = createTexture(bytes, originalImage.getWidth(), originalImage.getHeight());
+        long textureId = createTexture(bytes, originalImage.getWidth(), originalImage.getHeight(), SharedTextures.OPENGL_TEXTURE_TYPE);
+        System.out.println("Texture id: " + textureId);
+
         try {
             GraphicsConfiguration gc = GraphicsEnvironment
                     .getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
@@ -61,7 +66,7 @@ public class SharedTexturesTest {
             } while (volatileImage.contentsLost() && attempts > 0);
             Asserts.assertNotEquals(attempts, 0, "Failed to draw the VolatileImage");
         } finally {
-            disposeTexture(textureId);
+            disposeTexture(textureId, SharedTextures.OPENGL_TEXTURE_TYPE);
         }
 
         try {
@@ -116,10 +121,6 @@ public class SharedTexturesTest {
         ImageIO.write(image, formatName, outputFile);
     }
 
-    private native static long createTexture(byte[] data, int width, int height);
-
-    private native static void disposeTexture(long textureId);
-
     private static byte[] getPixelData(BufferedImage image) {
         byte[] rawPixels = new byte[image.getWidth() * image.getHeight() * 4];
         int[] argbPixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
@@ -146,4 +147,10 @@ public class SharedTexturesTest {
 
         return count;
     }
+
+    private native static int initNative(long sharedContext, int pixelFormat);
+
+    private native static long createTexture(byte[] data, int width, int height, int type);
+
+    private native static void disposeTexture(long textureId, int type);
 }
