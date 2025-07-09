@@ -30,7 +30,7 @@ public class SharedTexturesTest {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.println("MyPID: " + ProcessHandle.current().pid());
-        Thread.sleep(1000 * 60 * 60);
+//        Thread.sleep(1000 * 60 * 60);
         BufferedImage originalImage = createImage();
         byte[] bytes = getPixelData(originalImage);
 
