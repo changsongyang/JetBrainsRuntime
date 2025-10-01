@@ -40,8 +40,6 @@ public abstract class WLGraphicsConfig extends GraphicsConfiguration {
     private final WLGraphicsDevice device;
     private final int x;
     private final int y;
-    private final int xLogical; // logical (scaled) horizontal location; optional, could be zero
-    private final int yLogical; // logical (scaled) vertical location; optional, could be zero
     private final int width;
     private final int height;
     private final int widthLogical; // logical (scaled) width; optional, could be zero
@@ -49,14 +47,12 @@ public abstract class WLGraphicsConfig extends GraphicsConfiguration {
     private final int displayScale; // as reported by Wayland
     private final double effectiveScale; // as enforced by Java
 
-    protected WLGraphicsConfig(WLGraphicsDevice device, int x, int y, int xLogical, int yLogical,
+    protected WLGraphicsConfig(WLGraphicsDevice device, int x, int y,
                                int width, int height, int widthLogical, int heightLogical,
                                int displayScale) {
         this.device = device;
         this.x = x;
         this.y = y;
-        this.xLogical = xLogical;
-        this.yLogical = yLogical;
         this.width = width;
         this.height = height;
         this.widthLogical = widthLogical;
@@ -98,7 +94,7 @@ public abstract class WLGraphicsConfig extends GraphicsConfiguration {
     @Override
     public Rectangle getBounds() {
         return (widthLogical > 0 && heightLogical > 0)
-                ? new Rectangle(xLogical, yLogical, widthLogical, heightLogical)
+                ? new Rectangle(x, y, widthLogical, heightLogical)
                 : new Rectangle(x, y, width, height);
     }
 

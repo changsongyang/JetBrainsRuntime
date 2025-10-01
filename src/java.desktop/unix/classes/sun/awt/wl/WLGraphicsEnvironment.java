@@ -26,6 +26,7 @@
 
 package sun.awt.wl;
 
+import java.awt.AWTError;
 import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
@@ -95,6 +96,19 @@ public class WLGraphicsEnvironment extends SunGraphicsEnvironment implements HiD
     }
 
     @Override
+    public GraphicsDevice getDefaultScreenDevice() {
+        if (devices.isEmpty()) {
+            throw new AWTError("no screen devices");
+        }
+        return devices.getFirst();
+    }
+
+    @Override
+    public synchronized GraphicsDevice[] getScreenDevices() {
+        return devices.toArray(new GraphicsDevice[0]);
+    }
+
+    @Override
     public boolean isDisplayLocal() {
         return true;
     }
@@ -102,7 +116,7 @@ public class WLGraphicsEnvironment extends SunGraphicsEnvironment implements HiD
     private final List<WLGraphicsDevice> devices = new ArrayList<>(5);
 
     private void notifyOutputConfigured(String name, String make, String model, int wlID,
-                                        int x, int y, int xLogical, int yLogical,
+                                        int x, int y,
                                         int width, int height,
                                         int widthLogical, int heightLogical,
                                         int widthMm, int heightMm,
@@ -110,8 +124,8 @@ public class WLGraphicsEnvironment extends SunGraphicsEnvironment implements HiD
         // Called from native code whenever a new output appears or an existing one changes its properties
         // NB: initially called during WLToolkit.initIDs() on the main thread; later on EDT.
         if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Output configured id=%d at (%d, %d) (%d, %d logical) %dx%d (%dx%d logical) %dx scale",
-                    wlID, x, y, xLogical, yLogical, width, height, widthLogical, heightLogical, scale));
+            log.fine(String.format("Output configured id=%d at (%d, %d) %dx%d (%dx%d logical) %dx scale",
+                    wlID, x, y, width, height, widthLogical, heightLogical, scale));
         }
 
         String humanID =
@@ -124,12 +138,12 @@ public class WLGraphicsEnvironment extends SunGraphicsEnvironment implements HiD
                 final WLGraphicsDevice gd = devices.get(i);
                 if (gd.getID() == wlID) {
                     newOutput = false;
-                    if (gd.isSameDeviceAs(wlID, x, y, xLogical, yLogical)) {
+                    if (gd.isSameDeviceAs(wlID, x, y)) {
                         // These coordinates and the size are not scaled.
                         gd.updateConfiguration(humanID, width, height, widthLogical, heightLogical, scale);
                     } else {
                         final WLGraphicsDevice updatedDevice = WLGraphicsDevice.createWithConfiguration(wlID, humanID,
-                                x, y, xLogical, yLogical, width, height, widthLogical, heightLogical,
+                                x, y, width, height, widthLogical, heightLogical,
                                 widthMm, heightMm, scale);
                         devices.set(i, updatedDevice);
                         gd.invalidate(updatedDevice);
@@ -139,7 +153,7 @@ public class WLGraphicsEnvironment extends SunGraphicsEnvironment implements HiD
             }
             if (newOutput) {
                 final WLGraphicsDevice gd = WLGraphicsDevice.createWithConfiguration(wlID, humanID,
-                        x, y, xLogical, yLogical, width, height, widthLogical, heightLogical,
+                        x, y, width, height, widthLogical, heightLogical,
                         widthMm, heightMm, scale);
                 devices.add(gd);
             }
